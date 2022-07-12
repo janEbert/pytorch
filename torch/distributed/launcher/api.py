@@ -243,6 +243,7 @@ def launch_agent(
         master_addr=master_addr,
         master_port=master_port,
         local_addr=config.local_addr,
+        endpoint=rdzv_parameters.endpoint.strip(),
     )
 
     agent = LocalElasticAgent(
