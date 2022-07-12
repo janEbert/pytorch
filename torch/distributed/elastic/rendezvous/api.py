@@ -5,13 +5,12 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-import socket
-
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Callable, ClassVar, Dict, Optional
 
 from torch.distributed import Store
+import torch.distributed.elastic.rendezvous.utils as rdzv_utils
 from torch.distributed.elastic.utils.distributed import get_free_port as _get_free_port
 
 
@@ -66,14 +65,14 @@ class RendezvousStoreInfo:
     master_port: int
 
     @staticmethod
-    def build(rank: int, store: Store) -> "RendezvousStoreInfo":
+    def build(rank: int, store: Store, endpoint: Optional[str]) -> "RendezvousStoreInfo":
         """Factory method, finds unused new port on rank0 host and addr/port info with all ranks.
 
         If master_addr/master_port is knowns (useful when sharing existing tcp store server) use the constructor.
         """
         # TODO swap to collectives comms API
         if rank == 0:
-            addr = socket.getfqdn()
+            addr = rdzv_utils._get_fq_hostname(None, None, endpoint)
             port = _get_free_port()
             store.set(RendezvousStoreInfo.MASTER_ADDR_KEY, addr.encode(encoding="UTF-8"))  # type: ignore[arg-type]
             store.set(RendezvousStoreInfo.MASTER_PORT_KEY, str(port).encode(encoding="UTF-8"))  # type: ignore[arg-type]

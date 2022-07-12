@@ -10,7 +10,6 @@ import abc
 import json
 import os
 import signal
-import socket
 import time
 import traceback
 import warnings
@@ -67,6 +66,8 @@ class WorkerSpec:
                      if not specified then will chose a random free port
         master_addr: fixed master_addr to run the c10d store on rank 0
                      if not specified then will chose hostname on agent rank 0
+        endpoint: original endpoint that is discarded when the static
+                  rendezvous backend is specified
         redirects: redirect std streams to a file,
                    selectively redirect for a particular
                    local rank by passing a map
@@ -88,6 +89,7 @@ class WorkerSpec:
     master_port: Optional[int] = None
     master_addr: Optional[str] = None
     local_addr: Optional[str] = None
+    endpoint: Optional[str] = None
 
     def __post_init__(self):
         assert self.local_world_size > 0
@@ -355,10 +357,6 @@ class RunResult:
 
     def is_failed(self) -> bool:
         return self.state == WorkerState.FAILED
-
-
-def _get_fq_hostname() -> str:
-    return socket.getfqdn(socket.gethostname())
 
 
 class ElasticAgent(abc.ABC):
@@ -765,7 +763,7 @@ class SimpleElasticAgent(ElasticAgent):
             "group_rank": wg.group_rank,
             "worker_id": worker_id,
             "role": spec.role,
-            "hostname": _get_fq_hostname(),
+            "hostname": rdzv.utils._get_fq_hostname(spec.master_addr, spec.local_addr, spec.endpoint),
             "state": state,
             "total_run_time": self._total_execution_time,
             "rdzv_backend": spec.rdzv_handler.get_backend(),

@@ -987,6 +987,7 @@ class DynamicRendezvousHandler(RendezvousHandler):
     _op_executor: _RendezvousOpExecutor
     _heartbeat_lock: threading.Lock
     _keep_alive_timer: Optional[_PeriodicTimer]
+    _endpoint: Optional[str]
 
     @classmethod
     def from_backend(
@@ -998,6 +999,7 @@ class DynamicRendezvousHandler(RendezvousHandler):
         max_nodes: int,
         local_addr: Optional[str] = None,
         timeout: Optional[RendezvousTimeout] = None,
+        endpoint: Optional[str] = None,
     ):
         """Create a new :py:class:`DynamicRendezvousHandler`.
 
@@ -1016,6 +1018,9 @@ class DynamicRendezvousHandler(RendezvousHandler):
                 The local node address.
             timeout:
                 The timeout configuration of the rendezvous.
+            endpoint:
+                The original endpoint that is discarded when the static
+                rendezvous backend is specified
         """
         # We associate each handler instance with a unique node descriptor.
         node = cls._node_desc_generator.generate(local_addr)
@@ -1031,7 +1036,7 @@ class DynamicRendezvousHandler(RendezvousHandler):
 
         state_holder = _BackendRendezvousStateHolder(backend, settings)
 
-        return cls(node, settings, backend.name, store, state_holder)
+        return cls(node, settings, backend.name, store, state_holder, endpoint)
 
     def __init__(
         self,
@@ -1040,6 +1045,7 @@ class DynamicRendezvousHandler(RendezvousHandler):
         backend_name: str,
         store: Store,
         state_holder: _RendezvousStateHolder,
+        endpoint: Optional[str],
     ) -> None:
         if not settings.run_id:
             raise ValueError("The run id must be a non-empty string.")
@@ -1072,6 +1078,8 @@ class DynamicRendezvousHandler(RendezvousHandler):
         self._heartbeat_lock = threading.Lock()
 
         self._keep_alive_timer = None
+
+        self._endpoint = endpoint
 
     def _record(
         self,
@@ -1147,7 +1155,7 @@ class DynamicRendezvousHandler(RendezvousHandler):
         self._record(message=msg, rank=rank)
         logger.info(msg)
 
-        bootstrap_store_info = RendezvousStoreInfo.build(rank, store)
+        bootstrap_store_info = RendezvousStoreInfo.build(rank, store, self._endpoint)
         return RendezvousInfo(
             store,
             rank,
@@ -1348,6 +1356,7 @@ def create_handler(
             params.max_nodes,
             params.local_addr,
             timeout,
+            params.endpoint,
         )
     except Exception as e:
         construct_and_record_rdzv_event(

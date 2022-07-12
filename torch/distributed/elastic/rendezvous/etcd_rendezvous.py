@@ -163,7 +163,7 @@ class EtcdRendezvousHandler(RendezvousHandler):
         logger.info("Creating EtcdStore as the c10d::Store implementation")
         store = self._rdzv_impl.setup_kv_store(rdzv_version)
 
-        bootstrap_store_info = RendezvousStoreInfo.build(rank, store)
+        bootstrap_store_info = RendezvousStoreInfo.build(rank, store, self._rdzv_impl.endpoint)
         return RendezvousInfo(store, rank, world_size, bootstrap_store_info)
 
     def is_closed(self):
@@ -216,6 +216,7 @@ class EtcdRendezvous:
         num_max_workers,
         timeout,
         last_call_timeout,
+        endpoint,
     ):
         self.client = client
         logger.info("Etcd machines: %s", self.client.machines)
@@ -254,6 +255,8 @@ class EtcdRendezvous:
             )
         except etcd.EtcdAlreadyExist:
             pass
+
+        self.endpoint = endpoint
 
     def __del__(self):
         # TODO: look into using weakref here instead.
@@ -1052,5 +1055,6 @@ def create_rdzv_handler(params: RendezvousParameters) -> RendezvousHandler:
         num_max_workers=params.max_nodes,
         timeout=params.get_as_int("timeout", _DEFAULT_TIMEOUT),
         last_call_timeout=params.get_as_int("last_call_timeout", _DEFAULT_LAST_CALL_TIMEOUT),
+        endpoint=params.endpoint,
     )
     return EtcdRendezvousHandler(rdzv_impl=rdzv)

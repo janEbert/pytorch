@@ -201,6 +201,38 @@ def _matches_machine_hostname(host: str) -> bool:
     return False
 
 
+def _get_fq_hostname(
+    master_addr: Optional[str],
+    local_addr: Optional[str],
+    endpoint: Optional[str],
+) -> str:
+    if master_addr:
+        return master_addr
+
+    # If user specified the address for the local node, use it as the
+    # `master_addr` if it does not exist.
+    if local_addr:
+        return local_addr
+
+    # `master_addr` is None when we don't have the "static" rendezvous backend.
+    # `endpoint` may not be given (i.e. it is an empty string); then
+    # we have to fall back to `socket.gethostname`.
+    if not endpoint:
+        return socket.getfqdn(socket.gethostname())
+
+    host = parse_rendezvous_endpoint(endpoint, default_port=-1)[0]
+    try:
+        ipaddress.ip_address(host)
+        is_ip = True
+    except ValueError:
+        is_ip = False
+
+    if is_ip:
+        return socket.gethostbyaddr(host)[0]
+    else:
+        return socket.getfqdn(host)
+
+
 def _delay(seconds: Union[float, Tuple[float, float]]) -> None:
     """Suspend the current thread for ``seconds``.
 
